@@ -5,134 +5,115 @@ Purpose: Read GitHub Archive JSON data and perform CRUD operations
          using MongoDB.
 """
 
-import json
-from pymongo import MongoClient
-
-
-# Connect to MongoDB
-client = MongoClient("mongodb://localhost:27017/")
-
-# Create database and collection
-db = client["github_archive"]
-collection = db["repositories"]
-
-
-def load_json_data(file_path):
-    """
-    Reads JSON formatted GitHub Archive data
-    and stores records in MongoDB.
-    """
-
-    with open(file_path, "r") as file:
-        for line in file:
-            record = json.loads(line)
-
-            # Insert data into MongoDB
-            collection.insert_one(record)
-
-    print("JSON data successfully loaded into MongoDB.")
-
-
-def create_record():
+def create_record(myCollection):
     """
     Creates a new repository record.
     """
+    repo_name = input("Repository name (example: user_name/repo_name)").strip()
+    license_name = input("License name: ").strip()
+
+    if repo_name == "" or license_name == "":
+        print("Your input cannot be blank...")
+        return
 
     repo = {
-        "repo_name": input("Repository name: "),
-        "watch_count": input("Watch count: ")
+        "repo_name": repo_name,
+        "license": license_name
     }
 
-    collection.insert_one(repo)
+    myCollection.insert_one(repo)
 
-    print("Record created.")
+    print(f"Record {repo_name} created...")
 
 
-def read_records():
+def read_record(myCollection):
     """
     Reads and displays MongoDB records.
     """
 
-    records = collection.find()
+    search = input("Repository name search by regex: (example: user_name/repo_name)").strip()
+
+    if search == "":
+        print("Your input cannot be blank...")
+        return
+
+    records = myCollection.find({
+        "repo_name": {"$regex": search, "$options": "i"}
+        })
+
+    found = False
 
     for record in records:
         print(record)
+        found = True
 
+    if not found:
+        print(f"No matching repo or username found with value {search}...")
 
-def update_record():
+def update_record(myCollection):
     """
-    Updates repository watch count.
+    Updates repository license name.
     """
 
-    name = input("Enter repository name to update: ")
+    repo_name = input("Enter repository name to update (example: user_name/repo_name): ").strip()
 
-    new_count = input("Enter new watch count: ")
+    new_license = input("Enter new license: ").strip()
 
-    collection.update_one(
-        {"repo_name": name},
+    if repo_name == "" or new_license == "":
+        print("Your input cannot be blank...")
+        return
+
+    result = myCollection.update_one(
+        {"repo_name": repo_name},
         {
             "$set": {
-                "watch_count": new_count
+                "license": new_license
             }
         }
     )
 
-    print("Record updated.")
+    if result.matched_count == 0:
+        print("Repository does not exist...")
+    else:
+        print(f"Record {repo_name} updated.")
 
 
-def delete_record():
+def delete_record(myCollection):
     """
     Deletes a repository record.
     """
 
-    name = input("Enter repository name to delete: ")
+    repo_name = input("Enter repository name to delete: ").strip()
 
-    collection.delete_one(
-        {"repo_name": name}
+    if repo_name == "":
+        print("Your input cannot be blank...")
+        return
+
+    result = myCollection.delete_one(
+        {"repo_name": repo_name}
     )
 
-    print("Record deleted.")
+    if result.deleted_count == 0:
+        print("Repository does not exist...")
+    else:
+        print(f"Repository {repo_name} deleted.")
 
+# deletes all records in the collection
+def delete_all_records(myCollection):
 
-def menu():
+    confirm = input("Are you sure you want to continue? (Y/N): ").strip().upper()
+    if confirm == "Y":
 
-    while True:
-
-        print("\nMongoDB CRUD Menu")
-        print("1. Load GitHub Archive JSON Data")
-        print("2. Create Record")
-        print("3. Read Records")
-        print("4. Update Record")
-        print("5. Delete Record")
-        print("6. Exit")
-
-        choice = input("Select option: ")
-
-        if choice == "1":
-            load_json_data(
-                "Sample_Repos.json"
-            )
-
-        elif choice == "2":
-            create_record()
-
-        elif choice == "3":
-            read_records()
-
-        elif choice == "4":
-            update_record()
-
-        elif choice == "5":
-            delete_record()
-
-        elif choice == "6":
-            print("Program ended.")
-            break
-
+        final = input("Confirm again (Y/N): ").strip().upper()
+        if final == "Y":
+            result = myCollection.delete_many({})
+            print(f"{result.deleted_count} records deleted...")
+        elif final == "N":
+            print("Operation cancelled...")
         else:
-            print("Invalid option.")
+            print("Invalid selection...")
 
-
-# Start application
-if __name__ == "__main__":
-    menu()
+    elif confirm == "N":
+        print("Operation cancelled...")
+    else:
+        print("Invalid selection...")
